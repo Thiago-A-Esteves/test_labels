@@ -10,9 +10,24 @@ jobs:
     permissions:
       issues: write
     steps:
-      - run: gh issue edit "$NUMBER" --add-label "$LABELS"
+      - name: Definir Label Padrão
+        run: echo "LABELS=triage" >> $GITHUB_ENV
+
+      - name: Verificar se a Issue menciona 'bug'
+        run: |
+          ISSUE_BODY=$(gh issue view "$NUMBER" --json body,title | jq -r '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
+          if echo "$ISSUE_BODY" | grep -q "bug"; then
+            echo "LABELS=triage,bug" >> $GITHUB_ENV
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
-          LABELS: triage
+
+      - name: Adicionar Label na Issue
+        run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+
