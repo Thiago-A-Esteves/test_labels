@@ -2,83 +2,65 @@ name: Label issues
 on:
   issues:
     types:
+      - reopened
       - opened
 jobs:
   label_issues:
     runs-on: ubuntu-latest
     permissions:
       issues: write
-      contents: read
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
       - name: Define Labels
         run: |
-          ISSUE_NUMBER=${{ github.event.issue.number }}
-          ISSUE_VIEW=$(gh issue view "$ISSUE_NUMBER" --json body,title -q '.body + " " + .title')
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to view issue $ISSUE_NUMBER"
-            echo "$ISSUE_VIEW"
-            exit 1
-          fi
-          ISSUE_DATA=$(echo "$ISSUE_VIEW" | tr '[:upper:]' '[:lower:]')
-          LABELS=""
-          LABEL_FOUND=false
+          ISSUE_DATA=$(gh issue view "$NUMBER" --json body,title -q '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
+          LABELS="" # Start with empty labels
+          MAPPING=(
+            "bug:bug"
+            "feature:feature"
+            "documentation:documentation"
+            "performance:performance"
+            "security:security"
+            "optimization:optimization"
+            "interface|ui|ux:ui/ux"
+            "test:testing"
+            "refactor:refactor"
+            "dependency:dependency"
+            "api:api"
+            "database|db:database"
+            "configuration|config:configuration"
+            "accessibility|a11y:accessibility"
+            "regression:regression"
+            "enhancement:enhancement"
+            "breaking change:breaking-change"
+            "support:support"
+            "question:question"
+            "help:help"
+            "urgent:urgent"
+            "blocked:blocked"
+            "duplicate:duplicate"
+            "wip:wip"
+          )
+          LABEL_FOUND=false # Flag to track if any label was found
+          for MAP in "${MAPPING[@]}"; do
+            KEYWORD=$(echo "$MAP" | cut -d':' -f1)
+            LABEL=$(echo "$MAP" | cut -d':' -f2)
+            if [[ "$ISSUE_DATA" =~ $KEYWORD ]]; then
+              LABELS="$LABELS,$LABEL"
+              LABEL_FOUND=true # Set flag to true if a label is added
+            fi
+          done
 
-          # Check for exact duplicate issues
-          DUPLICATE_ISSUE=$(gh issue list --search '"$ISSUE_DATA"' --json number -q '.[].number' | grep -v "$ISSUE_NUMBER")
+          # Remove leading comma if any
+          LABELS=$(echo "$LABELS" | sed 's/^,//')
 
-          if [[ -n "$DUPLICATE_ISSUE" ]]; then
-            LABELS="duplicate"
-            LABEL_FOUND=true
-          else
-
-            MAPPING=(
-              "bug:bug"
-              "feature:feature"
-              "documentation:documentation"
-              "performance:performance"
-              "security:security"
-              "optimization:optimization"
-              "interface|ui|ux:ui/ux"
-              "test:testing"
-              "refactor:refactor"
-              "dependency:dependency"
-              "api:api"
-              "database|db:database"
-              "configuration|config:configuration"
-              "accessibility|a11y:accessibility"
-              "regression:regression"
-              "enhancement:enhancement"
-              "breaking change:breaking-change"
-              "support:support"
-              "question:question"
-              "help:help"
-              "urgent:urgent"
-              "blocked:blocked"
-              "wip:wip"
-            )
-
-            for MAP in "${MAPPING[@]}"; do
-              KEYWORD=$(echo "$MAP" | cut -d':' -f1)
-              LABEL=$(echo "$MAP" | cut -d':' -f2)
-              if [[ "$ISSUE_DATA" =~ $KEYWORD ]]; then
-                LABELS="$LABELS,$LABEL"
-                LABEL_FOUND=true
-              fi
-            done
-
-            LABELS=$(echo "$LABELS" | sed 's/^,//') # Remove leading comma
-          fi
-
+          # Add "triage" if no other labels were found
           if [[ "$LABEL_FOUND" == false ]]; then
             LABELS="triage"
           fi
 
+          # Remove duplicates and trailing comma
           LABELS=$(echo "$LABELS" | tr ',' '\n' | sort -u | tr '\n' ',')
-          LABELS=$(echo "$LABELS" | sed 's/,$//') # Remove trailing comma
+          LABELS=$(echo "$LABELS" | sed 's/,$//')
 
           echo "LABELS=$LABELS" >> $GITHUB_ENV
         env:
@@ -91,3 +73,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
