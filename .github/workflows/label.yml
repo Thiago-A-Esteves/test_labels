@@ -17,17 +17,15 @@ jobs:
       - name: Define Labels
         run: |
           ISSUE_NUMBER=${{ github.event.issue.number }}
-          ISSUE_DATA=$(gh issue view "$ISSUE_NUMBER" --json body,title -q '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
+          ISSUE_VIEW=$(gh issue view "$ISSUE_NUMBER" --json body,title -q '.body + " " + .title')
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to view issue $ISSUE_NUMBER"
+            echo "$ISSUE_VIEW"
+            exit 1
+          fi
+          ISSUE_DATA=$(echo "$ISSUE_VIEW" | tr '[:upper:]' '[:lower:]')
           LABELS=""
           LABEL_FOUND=false
-
-          # Check for exact duplicate issues
-          DUPLICATE_ISSUE=$(gh issue list --search '"$ISSUE_DATA"' --json number -q '.[].number' | grep -v "$ISSUE_NUMBER")
-
-          if [[ -n "$DUPLICATE_ISSUE" ]]; then
-            LABELS="duplicate"
-            LABEL_FOUND=true
-          else
 
             MAPPING=(
               "bug:bug"
