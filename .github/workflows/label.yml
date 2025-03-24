@@ -13,7 +13,7 @@ jobs:
       - name: Define Labels
         run: |
           ISSUE_DATA=$(gh issue view "$NUMBER" --json body,title -q '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
-          LABELS="triage"
+          LABELS="" # Start with empty labels
           MAPPING=(
             "bug:bug"
             "feature:feature"
@@ -35,38 +35,32 @@ jobs:
             "support:support"
             "question:question"
             "help:help"
+            "urgent:urgent"
+            "blocked:blocked"
+            "duplicate:duplicate"
+            "wip:wip"
           )
+          LABEL_FOUND=false # Flag to track if any label was found
           for MAP in "${MAPPING[@]}"; do
             KEYWORD=$(echo "$MAP" | cut -d':' -f1)
             LABEL=$(echo "$MAP" | cut -d':' -f2)
             if [[ "$ISSUE_DATA" =~ $KEYWORD ]]; then
               LABELS="$LABELS,$LABEL"
+              LABEL_FOUND=true # Set flag to true if a label is added
             fi
           done
 
-          # Regex for complex patterns
-          if [[ "$ISSUE_DATA" =~ \[wip\] ]]; then
-            LABELS="$LABELS,wip"
+          # Remove leading comma if any
+          LABELS=$(echo "$LABELS" | sed 's/^,//')
+
+          # Add "triage" if no other labels were found
+          if [[ "$LABEL_FOUND" == false ]]; then
+            LABELS="triage"
           fi
 
-          if [[ "$ISSUE_DATA" =~ \[urgent\] ]]; then
-            LABELS="$LABELS,urgent"
-          fi
-
-          if [[ "$ISSUE_DATA" =~ \[blocked\] ]]; then
-            LABELS="$LABELS,blocked"
-          fi
-
-          if [[ "$ISSUE_DATA" =~ \[duplicate\] ]]; then
-            LABELS="$LABELS,duplicate"
-          fi
-
-          # Remove duplicates and add "unclassified" if no other labels than "triage"
+          # Remove duplicates and trailing comma
           LABELS=$(echo "$LABELS" | tr ',' '\n' | sort -u | tr '\n' ',')
-          LABELS=$(echo "$LABELS" | sed 's/,$//') # remove the last comma
-          if [[ "$LABELS" == "triage" ]]; then
-            LABELS="$LABELS,unclassified"
-          fi
+          LABELS=$(echo "$LABELS" | sed 's/,$//')
 
           echo "LABELS=$LABELS" >> $GITHUB_ENV
         env:
