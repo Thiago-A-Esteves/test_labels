@@ -27,6 +27,14 @@ jobs:
           LABELS=""
           LABEL_FOUND=false
 
+          # Check for exact duplicate issues
+          DUPLICATE_ISSUE=$(gh issue list --search '"$ISSUE_DATA"' --json number -q '.[].number' | grep -v "$ISSUE_NUMBER")
+
+          if [[ -n "$DUPLICATE_ISSUE" ]]; then
+            LABELS="duplicate"
+            LABEL_FOUND=true
+          else
+
             MAPPING=(
               "bug:bug"
               "feature:feature"
@@ -83,4 +91,3 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          NUMBER: ${{ github.event.issue.number }}
