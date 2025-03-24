@@ -10,24 +10,73 @@ jobs:
     permissions:
       issues: write
     steps:
-      - name: Definir Label Padrão
-        run: echo "LABELS=triage" >> $GITHUB_ENV
-
-      - name: Verificar se a Issue menciona 'bug'
+      - name: Define Labels
         run: |
-          ISSUE_BODY=$(gh issue view "$NUMBER" --json body,title | jq -r '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
-          if echo "$ISSUE_BODY" | grep -q "bug"; then
-            echo "LABELS=triage,bug" >> $GITHUB_ENV
+          ISSUE_DATA=$(gh issue view "$NUMBER" --json body,title -q '.body + " " + .title' | tr '[:upper:]' '[:lower:]')
+          LABELS="triage"
+          MAPPING=(
+            "bug:bug"
+            "feature:feature"
+            "documentation:documentation"
+            "performance:performance"
+            "security:security"
+            "optimization:optimization"
+            "interface|ui|ux:ui/ux"
+            "test:testing"
+            "refactor:refactor"
+            "dependency:dependency"
+            "api:api"
+            "database|db:database"
+            "configuration|config:configuration"
+            "accessibility|a11y:accessibility"
+            "regression:regression"
+            "enhancement:enhancement"
+            "breaking change:breaking-change"
+            "support:support"
+            "question:question"
+            "help:help"
+          )
+          for MAP in "${MAPPING[@]}"; do
+            KEYWORD=$(echo "$MAP" | cut -d':' -f1)
+            LABEL=$(echo "$MAP" | cut -d':' -f2)
+            if [[ "$ISSUE_DATA" =~ $KEYWORD ]]; then
+              LABELS="$LABELS,$LABEL"
+            fi
+          done
+
+          # Regex for complex patterns
+          if [[ "$ISSUE_DATA" =~ \[wip\] ]]; then
+            LABELS="$LABELS,wip"
           fi
+
+          if [[ "$ISSUE_DATA" =~ \[urgent\] ]]; then
+            LABELS="$LABELS,urgent"
+          fi
+
+          if [[ "$ISSUE_DATA" =~ \[blocked\] ]]; then
+            LABELS="$LABELS,blocked"
+          fi
+
+          if [[ "$ISSUE_DATA" =~ \[duplicate\] ]]; then
+            LABELS="$LABELS,duplicate"
+          fi
+
+          # Remove duplicates and add "unclassified" if no other labels than "triage"
+          LABELS=$(echo "$LABELS" | tr ',' '\n' | sort -u | tr '\n' ',')
+          LABELS=$(echo "$LABELS" | sed 's/,$//') # remove the last comma
+          if [[ "$LABELS" == "triage" ]]; then
+            LABELS="$LABELS,unclassified"
+          fi
+
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
 
-      - name: Adicionar Label na Issue
+      - name: Add Labels to Issue
         run: gh issue edit "$NUMBER" --add-label "$LABELS"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
-
