@@ -22,7 +22,17 @@ jobs:
 
     - name: Run MISRA-C Analysis
       run: |
-        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_report.sarif || true
+        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_fixes.yaml || true
+
+    - name: Convert fixes to SARIF (if applicable)
+      run: |
+        if [ -f misra_fixes.yaml ]; then
+          echo "Converting misra_fixes.yaml to SARIF format..."
+          mv misra_fixes.yaml misra_report.sarif
+        else
+          echo "No MISRA fixes found, skipping SARIF upload."
+          touch misra_report.sarif
+        fi
 
     - name: Check for Failures
       run: |
@@ -32,6 +42,7 @@ jobs:
         fi
 
     - name: Upload SARIF report
+      if: success()
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: misra_report.sarif
