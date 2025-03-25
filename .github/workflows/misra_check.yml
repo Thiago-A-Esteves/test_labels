@@ -9,18 +9,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Dependencies (if needed)
+    - name: Install Dependencies
       run: |
-        # Example: Install clang-tidy
         sudo apt-get update
-        sudo apt-get install -y clang-tidy
+        sudo apt-get install -y clang-tidy-14
+
+    - name: Check for .clang-tidy configuration
+      run: |
+        if [ ! -f .clang-tidy ]; then
+          echo "No .clang-tidy config found, using defaults"
+        fi
 
     - name: Run MISRA-C Analysis
       run: |
-        # Example: Run clang-tidy on the entire project
-        find . -name "*.c" -o -name "*.h" -print0 | xargs -0 -n1 clang-tidy --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=*
+        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_report.sarif || true
 
-    - name: Upload SARIF report (optional, for advanced integration)
+    - name: Check for Failures
+      run: |
+        if grep -q "error:" misra_report.sarif; then
+          echo "MISRA-C violations found!"
+          exit 1
+        fi
+
+    - name: Upload SARIF report
       uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: misra_report.sarif # If your tool can output SARIF
+        sarif_file: misra_report.sarif
