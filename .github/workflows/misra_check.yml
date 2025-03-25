@@ -42,7 +42,7 @@ jobs:
         fi
 
     - name: Upload SARIF report
-      if: success() && hashCode('misra_report.sarif') != 0
+      if: success() && exists('misra_report.sarif')
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: misra_report.sarif
