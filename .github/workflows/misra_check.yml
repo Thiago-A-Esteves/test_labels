@@ -1,0 +1,26 @@
+name: MISRA-C Check
+
+on: [push, pull_request]
+
+jobs:
+  misra_analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Dependencies (if needed)
+      run: |
+        # Example: Install clang-tidy
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy
+
+    - name: Run MISRA-C Analysis
+      run: |
+        # Example: Run clang-tidy on the entire project
+        find . -name "*.c" -o -name "*.h" -print0 | xargs -0 -n1 clang-tidy --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=*
+
+    - name: Upload SARIF report (optional, for advanced integration)
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: misra_report.sarif # If your tool can output SARIF
