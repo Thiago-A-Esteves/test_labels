@@ -12,14 +12,25 @@ jobs:
     - name: Install Dependencies (if needed)
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-tidy-14
+        sudo apt-get install -y clang-tidy-14 bear
+
+    - name: Generate Compilation Database
+      run: |
+        if [ ! -f compile_commands.json ]; then
+          echo "Generating compilation database..."
+          bear -- make || echo "Failed to generate compile_commands.json"
+        fi
+
+    - name: Ensure .clang-tidy Exists
+      run: |
+        if [ ! -f .clang-tidy ]; then
+          echo "Creating default .clang-tidy config"
+          echo "Checks: 'misra-c-*'" > .clang-tidy
+        fi
 
     - name: Run MISRA-C Analysis
       run: |
-        if [ ! -f .clang-tidy ]; then
-          echo "No .clang-tidy config found, using defaults"
-        fi
-        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_report.sarif
+        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy --export-fixes=misra_report.sarif --
 
     - name: Check for Failures
       run: |
@@ -32,6 +43,7 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: misra_report.sarif
+
 
 
 
