@@ -9,42 +9,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Dependencies
+    - name: Install Dependencies (if needed)
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-tidy-14 jq
+        sudo apt-get install -y clang-tidy-14
 
-    - name: Check for .clang-tidy configuration
+    - name: Run MISRA-C Analysis
       run: |
         if [ ! -f .clang-tidy ]; then
           echo "No .clang-tidy config found, using defaults"
         fi
-
-    - name: Run MISRA-C Analysis
-      run: |
-        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_fixes.yaml || true
-
-    - name: Convert fixes to SARIF (if applicable)
-      run: |
-        if [ -s misra_fixes.yaml ]; then
-          echo "Converting misra_fixes.yaml to SARIF format..."
-          echo '{"version": "2.1.0", "runs": []}' > misra_report.sarif  # Placeholder SARIF
-        else
-          echo "No MISRA fixes found, skipping SARIF upload."
-          rm -f misra_report.sarif
-        fi
+        find . -name "*.c" -o -name "*.h" | xargs clang-tidy-14 --config-file=.clang-tidy -checks="misra-c-*" --warnings-as-errors=* --export-fixes=misra_report.sarif
 
     - name: Check for Failures
       run: |
-        if [ -f misra_report.sarif ] && grep -q "error:" misra_report.sarif; then
+        if grep -q "error:" misra_report.sarif; then
           echo "MISRA-C violations found!"
           exit 1
         fi
 
-    - name: Upload SARIF report
-      if: success() && exists('misra_report.sarif')
+    - name: Upload SARIF report (optional, for advanced integration)
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: misra_report.sarif
+
 
 
